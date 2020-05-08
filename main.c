@@ -1,3 +1,5 @@
+#define _POSIX_C_SOURCE 200809L
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,8 +14,14 @@
 #include "shm.h"
 #include "xdg-shell-client-protocol.h"
 
-static const int width = 128;
-static const int height = 128;
+static int width;
+static int height;
+void *mf_data;
+volatile int mf_update = 0;
+volatile int on_top = 1;
+struct wl_display *display;
+int stride;
+int size;
 
 static bool running = true;
 
@@ -49,28 +57,28 @@ static const struct xdg_toplevel_listener xdg_toplevel_listener = {
 	.close = xdg_toplevel_handle_close,
 };
 
-static void pointer_handle_button(void *data, struct wl_pointer *pointer,
-		uint32_t serial, uint32_t time, uint32_t button, uint32_t state) {
-	struct wl_seat *seat = data;
-
-	if (button == BTN_LEFT && state == WL_POINTER_BUTTON_STATE_PRESSED) {
-		xdg_toplevel_move(xdg_toplevel, seat, serial);
-	}
+static void keyboard_handle_enter(void *data, struct wl_keyboard *keyboard,
+		uint32_t serial, struct wl_surface *surface, struct wl_array *keys) {
+	on_top = 1;
+}
+static void keyboard_handle_leave(void *data, struct wl_keyboard *keyboard,
+		uint32_t serial, struct wl_surface *surface) {
+	on_top = 1;
 }
 
-static const struct wl_pointer_listener pointer_listener = {
-	.enter = noop,
-	.leave = noop,
-	.motion = noop,
-	.button = pointer_handle_button,
-	.axis = noop,
+static const struct wl_keyboard_listener keyboard_listener = {
+	.keymap = noop,
+	.enter = keyboard_handle_enter,
+	.leave = keyboard_handle_leave,
+	.key = noop,
+	.modifiers = noop,
 };
 
 static void seat_handle_capabilities(void *data, struct wl_seat *seat,
 		uint32_t capabilities) {
-	if (capabilities & WL_SEAT_CAPABILITY_POINTER) {
-		struct wl_pointer *pointer = wl_seat_get_pointer(seat);
-		wl_pointer_add_listener(pointer, &pointer_listener, seat);
+	if (capabilities & WL_SEAT_CAPABILITY_KEYBOARD) {
+		struct wl_keyboard *keyboard = wl_seat_get_keyboard(seat);
+		wl_keyboard_add_listener(keyboard, &keyboard_listener, NULL);
 	}
 }
 
@@ -105,9 +113,6 @@ static const struct wl_registry_listener registry_listener = {
 };
 
 static struct wl_buffer *create_buffer() {
-	int stride = width * 4;
-	int size = stride * height;
-
 	int fd = create_shm_file(size);
 	if (fd < 0) {
 		fprintf(stderr, "creating a buffer file for %d B failed: %m\n", size);
@@ -123,16 +128,62 @@ static struct wl_buffer *create_buffer() {
 
 	struct wl_shm_pool *pool = wl_shm_create_pool(shm, fd, size);
 	struct wl_buffer *buffer = wl_shm_pool_create_buffer(pool, 0, width, height,
-		stride, WL_SHM_FORMAT_ARGB8888);
+		stride, WL_SHM_FORMAT_XRGB8888);
 	wl_shm_pool_destroy(pool);
 
-	// MagickImage is from cat.h
-	memcpy(shm_data, MagickImage, size);
+	memcpy(shm_data, mf_data, size);
 	return buffer;
 }
 
+void update(int signum)
+{
+  if (on_top == 0) write(STDOUT_FILENO, "0", 1);
+  else mf_update = 1;
+}
+
+void terminate(int signum)
+{
+  wl_display_disconnect(display);
+  exit(0);
+}
+
+void redraw(void *data, struct wl_callback *callback, uint32_t time);
+const struct wl_callback_listener frame_listener = { redraw };
+void redraw(void *data, struct wl_callback *callback, uint32_t time)
+{
+    wl_callback_destroy(callback);
+    if (mf_update) {
+      mf_update = 0;
+      memcpy(shm_data, mf_data, size);
+      wl_surface_damage(surface, 0, 0, width, height);
+      write(STDOUT_FILENO, "1", 1);
+    }
+    wl_callback_add_listener(wl_surface_frame(surface), &frame_listener, NULL);
+    wl_surface_commit(surface);
+}
+
 int main(int argc, char *argv[]) {
-	struct wl_display *display = wl_display_connect(NULL);
+	if (sscanf(getenv("SCREEN_WIDTH"), "%d", &width) != 1) exit(EXIT_FAILURE);
+	if (sscanf(getenv("SCREEN_DEPTH"), "%d", &height) != 1) exit(EXIT_FAILURE);
+	stride = width * 4;
+	size = stride * height;
+
+	struct sigaction sa;
+
+	sa.sa_handler = update;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_RESTART;
+	sigaction(SIGUSR1, &sa, NULL);
+
+	sa.sa_handler = terminate;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = 0;
+	sigaction(SIGTERM, &sa, NULL);
+
+	mf_data = mmap(NULL, size, PROT_READ, MAP_SHARED, STDIN_FILENO, 0);
+	if (mf_data == MAP_FAILED) exit(1);
+
+	display = wl_display_connect(NULL);
 	if (display == NULL) {
 		fprintf(stderr, "failed to create display\n");
 		return EXIT_FAILURE;
@@ -164,7 +215,10 @@ int main(int argc, char *argv[]) {
 	wl_display_roundtrip(display);
 
 	wl_surface_attach(surface, buffer, 0, 0);
+	wl_callback_add_listener(wl_surface_frame(surface), &frame_listener, NULL);
 	wl_surface_commit(surface);
+
+	write(STDOUT_FILENO, "", 1);
 
 	while (wl_display_dispatch(display) != -1 && running) {
 		// This space intentionally left blank
