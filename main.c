@@ -10,9 +10,7 @@
 #include <wayland-client-protocol.h>
 #include <linux/input-event-codes.h>
 
-#include "cat.h"
 #include "shm.h"
-#include "xdg-shell-client-protocol.h"
 
 static int width;
 static int height;
@@ -23,38 +21,28 @@ struct wl_display *display;
 int stride;
 int size;
 
-static bool running = true;
+static volatile bool running = true;
 
 static struct wl_shm *shm = NULL;
 static struct wl_compositor *compositor = NULL;
-static struct xdg_wm_base *xdg_wm_base = NULL;
 
 static void *shm_data = NULL;
 static struct wl_surface *surface = NULL;
-static struct xdg_toplevel *xdg_toplevel = NULL;
+static struct wl_shell *shell = NULL;
 
 static void noop() {
 	// This space intentionally left blank
 }
 
-static void xdg_surface_handle_configure(void *data,
-		struct xdg_surface *xdg_surface, uint32_t serial) {
-	xdg_surface_ack_configure(xdg_surface, serial);
-	wl_surface_commit(surface);
+static void wl_shell_surface_handle_ping(void *data,
+		struct wl_shell_surface *shell_surface, uint32_t serial) {
+	wl_shell_surface_pong(shell_surface, serial);
 }
 
-static const struct xdg_surface_listener xdg_surface_listener = {
-	.configure = xdg_surface_handle_configure,
-};
-
-static void xdg_toplevel_handle_close(void *data,
-		struct xdg_toplevel *xdg_toplevel) {
-	running = false;
-}
-
-static const struct xdg_toplevel_listener xdg_toplevel_listener = {
+static const struct wl_shell_surface_listener shell_surface_listener = {
+	.ping = wl_shell_surface_handle_ping,
 	.configure = noop,
-	.close = xdg_toplevel_handle_close,
+	.popup_done = noop,
 };
 
 static void keyboard_handle_enter(void *data, struct wl_keyboard *keyboard,
@@ -97,8 +85,8 @@ static void handle_global(void *data, struct wl_registry *registry,
 	} else if (strcmp(interface, wl_compositor_interface.name) == 0) {
 		compositor = wl_registry_bind(registry, name,
 			&wl_compositor_interface, 1);
-	} else if (strcmp(interface, xdg_wm_base_interface.name) == 0) {
-		xdg_wm_base = wl_registry_bind(registry, name, &xdg_wm_base_interface, 1);
+	} else if (strcmp(interface, wl_shell_interface.name) == 0) {
+		shell = wl_registry_bind(registry, name, &wl_shell_interface, 1);
 	}
 }
 
@@ -143,8 +131,7 @@ void update(int signum)
 
 void terminate(int signum)
 {
-  wl_display_disconnect(display);
-  exit(0);
+  running = false;
 }
 
 void redraw(void *data, struct wl_callback *callback, uint32_t time);
@@ -177,7 +164,7 @@ int main(int argc, char *argv[]) {
 
 	sa.sa_handler = terminate;
 	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = 0;
+	sa.sa_flags = SA_RESTART;
 	sigaction(SIGTERM, &sa, NULL);
 
 	mf_data = mmap(NULL, size, PROT_READ, MAP_SHARED, STDIN_FILENO, 0);
@@ -193,8 +180,8 @@ int main(int argc, char *argv[]) {
 	wl_registry_add_listener(registry, &registry_listener, NULL);
 	wl_display_roundtrip(display);
 
-	if (shm == NULL || compositor == NULL || xdg_wm_base == NULL) {
-		fprintf(stderr, "no wl_shm, wl_compositor or xdg_wm_base support\n");
+	if (shm == NULL || compositor == NULL) {
+		fprintf(stderr, "no wl_shm or wl_compositor\n");
 		return EXIT_FAILURE;
 	}
 
@@ -204,14 +191,11 @@ int main(int argc, char *argv[]) {
 	}
 
 	surface = wl_compositor_create_surface(compositor);
-	struct xdg_surface *xdg_surface =
-		xdg_wm_base_get_xdg_surface(xdg_wm_base, surface);
-	xdg_toplevel = xdg_surface_get_toplevel(xdg_surface);
+	struct wl_shell_surface *shell_surface = wl_shell_get_shell_surface(shell, surface);
+	wl_shell_surface_set_fullscreen(shell_surface, WL_SHELL_SURFACE_FULLSCREEN_METHOD_DEFAULT, 0, NULL);
 
-	xdg_surface_add_listener(xdg_surface, &xdg_surface_listener, NULL);
-	xdg_toplevel_add_listener(xdg_toplevel, &xdg_toplevel_listener, NULL);
+	wl_shell_surface_add_listener(shell_surface, &shell_surface_listener, NULL);
 
-	wl_surface_commit(surface);
 	wl_display_roundtrip(display);
 
 	wl_surface_attach(surface, buffer, 0, 0);
@@ -224,8 +208,7 @@ int main(int argc, char *argv[]) {
 		// This space intentionally left blank
 	}
 
-	xdg_toplevel_destroy(xdg_toplevel);
-	xdg_surface_destroy(xdg_surface);
+	wl_shell_surface_destroy(shell_surface);
 	wl_surface_destroy(surface);
 	wl_buffer_destroy(buffer);
 
