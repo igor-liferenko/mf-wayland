@@ -51,7 +51,7 @@ static void keyboard_handle_enter(void *data, struct wl_keyboard *keyboard,
 }
 static void keyboard_handle_leave(void *data, struct wl_keyboard *keyboard,
 		uint32_t serial, struct wl_surface *surface) {
-	on_top = 1;
+	on_top = 0;
 }
 
 static const struct wl_keyboard_listener keyboard_listener = {
