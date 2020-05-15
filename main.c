@@ -150,8 +150,7 @@ void redraw(void *data, struct wl_callback *callback, uint32_t time)
 }
 
 int main(int argc, char *argv[]) {
-	if (sscanf(getenv("SCREEN_WIDTH"), "%d", &width) != 1) exit(EXIT_FAILURE);
-	if (sscanf(getenv("SCREEN_DEPTH"), "%d", &height) != 1) exit(EXIT_FAILURE);
+	sscanf(getenv("SCREEN_SIZE"), "%dx%d", &width, &height);
 	stride = width * 4;
 	size = stride * height;
 
