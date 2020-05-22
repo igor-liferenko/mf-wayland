@@ -127,12 +127,6 @@ void update(int signum)
   else mf_update = 1;
 }
 
-void terminate(int signum)
-{
-  wl_display_disconnect(display);
-  exit(0);
-}
-
 void redraw(void *data, struct wl_callback *callback, uint32_t time);
 const struct wl_callback_listener frame_listener = { redraw };
 void redraw(void *data, struct wl_callback *callback, uint32_t time)
@@ -159,11 +153,6 @@ int main(int argc, char *argv[]) {
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = SA_RESTART;
 	sigaction(SIGUSR1, &sa, NULL);
-
-	sa.sa_handler = terminate;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = 0;
-	sigaction(SIGTERM, &sa, NULL);
 
 	mf_data = mmap(NULL, size, PROT_READ, MAP_SHARED, STDIN_FILENO, 0);
 	if (mf_data == MAP_FAILED) exit(1);
