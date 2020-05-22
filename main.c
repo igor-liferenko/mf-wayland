@@ -21,8 +21,6 @@ struct wl_display *display;
 int stride;
 int size;
 
-static volatile bool running = true;
-
 static struct wl_shm *shm = NULL;
 static struct wl_compositor *compositor = NULL;
 
@@ -131,7 +129,8 @@ void update(int signum)
 
 void terminate(int signum)
 {
-  running = false;
+  wl_display_disconnect(display);
+  exit(0);
 }
 
 void redraw(void *data, struct wl_callback *callback, uint32_t time);
@@ -163,7 +162,7 @@ int main(int argc, char *argv[]) {
 
 	sa.sa_handler = terminate;
 	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = SA_RESTART;
+	sa.sa_flags = 0;
 	sigaction(SIGTERM, &sa, NULL);
 
 	mf_data = mmap(NULL, size, PROT_READ, MAP_SHARED, STDIN_FILENO, 0);
@@ -203,7 +202,7 @@ int main(int argc, char *argv[]) {
 
 	write(STDOUT_FILENO, "", 1);
 
-	while (wl_display_dispatch(display) != -1 && running) {
+	while (wl_display_dispatch(display) != -1) {
 		// This space intentionally left blank
 	}
 
