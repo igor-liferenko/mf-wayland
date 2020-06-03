@@ -131,28 +131,21 @@ void redraw(void *data, struct wl_callback *callback, uint32_t time);
 const struct wl_callback_listener frame_listener = { redraw };
 void redraw(void *data, struct wl_callback *callback, uint32_t time)
 {
-    wl_callback_destroy(callback);
+    wl_callback_destroy(callback); // ???
     if (mf_update) {
       mf_update = 0;
       memcpy(shm_data, mf_data, size);
       wl_surface_damage(surface, 0, 0, width, height);
       write(STDOUT_FILENO, "1", 1);
     }
-    wl_callback_add_listener(wl_surface_frame(surface), &frame_listener, NULL);
-    wl_surface_commit(surface);
+    wl_callback_add_listener(wl_surface_frame(surface), &frame_listener, NULL); // ???
+    wl_surface_commit(surface); // move inside `if'?
 }
 
 int main(int argc, char *argv[]) {
 	sscanf(getenv("SCREEN_SIZE"), "%dx%d", &width, &height);
 	stride = width * 4;
 	size = stride * height;
-
-	struct sigaction sa;
-
-	sa.sa_handler = update;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = SA_RESTART;
-	sigaction(SIGUSR1, &sa, NULL);
 
 	mf_data = mmap(NULL, size, PROT_READ, MAP_SHARED, STDIN_FILENO, 0);
 	if (mf_data == MAP_FAILED) exit(1);
@@ -165,7 +158,7 @@ int main(int argc, char *argv[]) {
 
 	struct wl_registry *registry = wl_display_get_registry(display);
 	wl_registry_add_listener(registry, &registry_listener, NULL);
-	wl_display_roundtrip(display);
+	wl_display_roundtrip(display); // ???
 
 	if (shm == NULL || compositor == NULL) {
 		fprintf(stderr, "no wl_shm or wl_compositor\n");
@@ -183,21 +176,19 @@ int main(int argc, char *argv[]) {
 
 	wl_shell_surface_add_listener(shell_surface, &shell_surface_listener, NULL);
 
-	wl_display_roundtrip(display);
+	wl_display_roundtrip(display); // ???
 
 	wl_surface_attach(surface, buffer, 0, 0);
 	wl_callback_add_listener(wl_surface_frame(surface), &frame_listener, NULL);
 	wl_surface_commit(surface);
 
+        struct sigaction sa;
+        sa.sa_handler = update;
+        sigemptyset(&sa.sa_mask);
+        sa.sa_flags = SA_RESTART;
+        sigaction(SIGUSR1, &sa, NULL);
+
 	write(STDOUT_FILENO, "", 1);
 
-	while (wl_display_dispatch(display) != -1) {
-		// This space intentionally left blank
-	}
-
-	wl_shell_surface_destroy(shell_surface);
-	wl_surface_destroy(surface);
-	wl_buffer_destroy(buffer);
-
-	return EXIT_SUCCESS;
+	while (wl_display_dispatch(display) != -1) ;
 }
