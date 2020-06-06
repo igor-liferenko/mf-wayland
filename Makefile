@@ -10,7 +10,7 @@ SHM_FILES=shm.c shm.h
 
 all: hello-wayland
 
-hello-wayland: main.c $(SHM_FILES)
+hello-wayland: main.c shm.c
 	$(CC) $(CFLAGS) -o $@ $^ -lrt $(WAYLAND_FLAGS)
 
 xdg-shell-client-protocol.h:
