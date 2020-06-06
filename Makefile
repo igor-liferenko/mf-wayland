@@ -1,4 +1,4 @@
-WAYLAND_FLAGS = $(shell pkg-config wayland-client --cflags --libs)
+WAYLAND_FLAGS = -lwayland-client
 WAYLAND_PROTOCOLS_DIR = $(shell pkg-config wayland-protocols --variable=pkgdatadir)
 WAYLAND_SCANNER = $(shell pkg-config --variable=wayland_scanner wayland-scanner)
 CFLAGS ?= -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -g
@@ -10,8 +10,8 @@ SHM_FILES=shm.c shm.h
 
 all: hello-wayland
 
-hello-wayland: main.c cat.h $(XDG_SHELL_FILES) $(SHM_FILES)
-	$(CC) $(CFLAGS) -o $@ $^ -lrt $(WAYLAND_FLAGS)
+hello-wayland: main.c $(SHM_FILES)
+	gcc $(CFLAGS) -o $@ $^ -lrt $(WAYLAND_FLAGS)
 
 xdg-shell-client-protocol.h:
 	$(WAYLAND_SCANNER) client-header $(XDG_SHELL_PROTOCOL) xdg-shell-client-protocol.h
