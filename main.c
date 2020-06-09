@@ -191,4 +191,6 @@ int main(int argc, char *argv[]) {
 	write(STDOUT_FILENO, "", 1);
 
 	while (wl_display_dispatch(display) != -1) ;
+
+	return EXIT_FAILURE;
 }
