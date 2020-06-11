@@ -148,7 +148,7 @@ int main(int argc, char *argv[]) {
 	size = stride * height;
 
 	mf_data = mmap(NULL, size, PROT_READ, MAP_SHARED, STDIN_FILENO, 0);
-	if (mf_data == MAP_FAILED) exit(1);
+	if (mf_data == MAP_FAILED) return EXIT_FAILURE;
 
 	display = wl_display_connect(NULL);
 	if (display == NULL) {
