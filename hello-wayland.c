@@ -11,6 +11,8 @@
 #include <wayland-client.h>
 #include <xdg-shell.h>
 
+#define printf(...)
+
 typedef struct {
     struct wl_display * display;
     struct wl_registry * registry;
