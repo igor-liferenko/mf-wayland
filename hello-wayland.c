@@ -85,7 +85,7 @@ static void registry_event_add(
         ctx->compositor = (struct wl_compositor *)wl_registry_bind(registry, id, &wl_compositor_interface, 4);
         ctx->compositor_id = id;
     } else if (strcmp(interface, "wl_shm") == 0) {
-        if (ctx->compositor != NULL) {
+        if (ctx->shm != NULL) {
             printf("[!] wl_registry: duplicate shm\n");
             exit_fail(ctx);
         }
