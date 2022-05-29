@@ -173,6 +173,9 @@ static void surface_configure_resize(ctx_t * ctx, uint32_t width, uint32_t heigh
             printf("[!] mremap: failed to remap shm file\n");
             exit_fail(ctx);
         }
+        void *mf_data = mmap(NULL, size, PROT_READ, MAP_SHARED, STDIN_FILENO, 0);
+        if (mf_data == MAP_FAILED) exit(1);
+        memcpy(new_pixels, mf_data, size);
         ctx->shm_pixels = (uint32_t *)new_pixels;
         ctx->shm_size = size;
 
@@ -278,6 +281,7 @@ static void xdg_toplevel_event_configure(
 
     if (width == 0) width = 100;
     if (height == 0) height = 100;
+    sscanf(getenv("SCREEN_SIZE"), "%dx%d", &width, &height);
 
     if (width != ctx->shm_width || height != ctx->shm_height) {
         surface_configure_resize(ctx, width, height);
@@ -424,6 +428,7 @@ int main(void) {
     printf("[info] setting xdg_toplevel properties\n");
     xdg_toplevel_set_app_id(ctx->xdg_toplevel, "example");
     xdg_toplevel_set_title(ctx->xdg_toplevel, "example window");
+    xdg_toplevel_set_minimized(ctx->xdg_toplevel);
 
     printf("[info] committing surface to trigger configure events\n");
     wl_surface_commit(ctx->surface);
