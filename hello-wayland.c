@@ -429,6 +429,7 @@ int main(void) {
     xdg_toplevel_set_app_id(ctx->xdg_toplevel, "example");
     xdg_toplevel_set_title(ctx->xdg_toplevel, "example window");
     xdg_toplevel_set_minimized(ctx->xdg_toplevel);
+    xdg_toplevel_set_fullscreen(ctx->xdg_toplevel, NULL);
 
     printf("[info] committing surface to trigger configure events\n");
     wl_surface_commit(ctx->surface);
