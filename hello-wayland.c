@@ -281,7 +281,7 @@ static void xdg_toplevel_event_configure(
 
     if (width == 0) width = 100;
     if (height == 0) height = 100;
-    sscanf(getenv("SCREEN_SIZE"), "%dx%d", &width, &height);
+    sscanf(getenv("screen_size"), "%dx%d", &width, &height);
 
     if (width != ctx->shm_width || height != ctx->shm_height) {
         surface_configure_resize(ctx, width, height);
