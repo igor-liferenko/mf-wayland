@@ -1,2 +1,4 @@
+Install libwayland-bin libwayland-dev wayland-protocols
+
 cmake .
 make
