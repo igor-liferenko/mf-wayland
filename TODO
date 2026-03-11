@@ -1,0 +1,4 @@
+Re-do:
+1) Open maximized, not minimized.
+2) Kill existing mf-wayland process.
+3) Write to stdout one second after window was shown. 
